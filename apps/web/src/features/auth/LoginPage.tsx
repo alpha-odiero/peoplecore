@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth'
+import { apiClient } from '@/lib/api'
 import logo from '@/assets/PeopleCore.png'
 
 export function LoginPage() {
@@ -29,6 +30,19 @@ export function LoginPage() {
       toast.error(err instanceof Error ? err.message : 'Unable to sign in')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function onForgotPassword() {
+    if (!email.trim()) {
+      toast.info('Enter your email address first')
+      return
+    }
+    try {
+      await apiClient.post('/auth/forgot-password', { email })
+      toast.success('If the account exists, reset instructions have been sent')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to request a password reset')
     }
   }
 
@@ -121,7 +135,7 @@ export function LoginPage() {
                       <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
                       Remember me
                     </label>
-                    <button type="button" onClick={() => toast.info('Password reset will be available after backend integration.')} className="font-medium text-brand-600 hover:text-brand-700">Forgot password?</button>
+                    <button type="button" onClick={onForgotPassword} className="font-medium text-brand-600 hover:text-brand-700">Forgot password?</button>
                   </div>
 
                   <button type="submit" disabled={loading} className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-brand-600 via-brand-600 to-indigo-600 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/30 transition duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-brand-600/35 focus:ring-4 focus:ring-brand-500/20 disabled:translate-y-0 disabled:opacity-60">

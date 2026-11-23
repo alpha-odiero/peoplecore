@@ -12,6 +12,7 @@ import { SettingsPage } from '@/features/settings/SettingsPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
 import { ApprovalsPage } from '@/features/approvals/ApprovalsPage'
+import { AttendancePage } from '@/features/attendance/AttendancePage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
 import { LeavePage } from '@/features/leave/LeavePage'
 import { PayrollPage } from '@/features/payroll/PayrollPage'
@@ -40,6 +41,7 @@ export function App() {
           <Route path="tasks" element={<TasksPage />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="leave" element={<LeavePage />} />
+          <Route path="attendance" element={<AttendancePage />} />
           <Route path="payroll" element={<PayrollPage />} />
           <Route path="recruiting" element={<RecruitingPage />} />
           <Route path="onboarding" element={<OnboardingPage />} />

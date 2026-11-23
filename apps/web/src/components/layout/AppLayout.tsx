@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/auth'
+import { notificationsApi, type NotificationRecord } from '@/lib/api'
 import logo from '@/assets/PeopleCore.png'
 
 type IconProps = { className?: string }
@@ -33,6 +34,7 @@ const navItems = [
   { to: '/tasks', label: 'Tasks', icon: CheckIcon, section: 'Workflows', permission: null },
   { to: '/calendar', label: 'Calendar', icon: CalendarIcon, section: 'Workflows', permission: null },
   { to: '/leave', label: 'Leave', icon: CalendarIcon, section: 'Workflows', permission: null },
+  { to: '/attendance', label: 'Attendance', icon: CheckIcon, section: 'Workflows', permission: null },
   { to: '/payroll', label: 'Payroll', icon: MoneyIcon, section: 'Workflows', permission: null },
   { to: '/recruiting', label: 'Recruiting', icon: BriefcaseIcon, section: 'Talent', permission: null },
   { to: '/onboarding', label: 'Onboarding', icon: UsersIcon, section: 'Talent', permission: null },
@@ -43,20 +45,19 @@ const navItems = [
   { to: '/settings', label: 'Settings', icon: SettingsIcon, section: 'Administration', permission: null },
 ]
 
-const notifications: { id: number; title: string; body: string; unread: boolean }[] = []
-
 export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [cmdQ, setCmdQ] = useState('')
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([])
   const [dark, setDark] = useState(() => localStorage.getItem('ems_theme') === 'dark')
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout, hasPermission } = useAuth()
   const visibleNav = navItems.filter((n) => !n.permission || hasPermission(n.permission))
   const current = visibleNav.find((n) => (n.to === '/' ? location.pathname === '/' : location.pathname.startsWith(n.to)))
-  const unread = notifications.filter((n) => n.unread).length
+  const unread = notifications.filter((n) => !n.readAt).length
   const cmdResults = visibleNav.filter((n) => n.label.toLowerCase().includes(cmdQ.toLowerCase()))
 
   useEffect(() => {
@@ -69,11 +70,17 @@ export function AppLayout() {
   }, [])
 
   useEffect(() => {
+    notificationsApi.list()
+      .then((result) => setNotifications(result.data))
+      .catch(() => setNotifications([]))
+  }, [])
+
+  useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
     localStorage.setItem('ems_theme', dark ? 'dark' : 'light')
   }, [dark])
 
-  function handleLogout() { logout(); toast.success('Signed out'); navigate('/login') }
+  async function handleLogout() { await logout(); toast.success('Signed out'); navigate('/login') }
 
   return (
     <div className="min-h-screen bg-[#f4f7fb]">
@@ -81,7 +88,7 @@ export function AppLayout() {
         {mobileOpen && <div className="fixed inset-0 z-30 bg-slate-900/30 md:hidden" onClick={() => setMobileOpen(false)} />}
         <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-slate-200/80 bg-white/95 backdrop-blur transition-transform md:static md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="flex h-full flex-col">
-            <div className="px-4 py-2"><img src={logo} alt="PeopleCore" className="w-full object-contain" /></div>
+            <div className="px-4 py-2"><img src={logo} alt="PeopleCore" className="mx-auto w-4/5 object-contain" /></div>
             <nav className="flex-1 overflow-y-auto px-3 pb-4">
               {['Overview', 'Core HR', 'Workflows', 'Talent', 'Administration'].map((section) => {
                 const items = visibleNav.filter((n) => n.section === section)
@@ -118,8 +125,11 @@ export function AppLayout() {
                   <button onClick={() => setNotifOpen((v) => !v)} className="relative rounded-xl p-2.5 text-slate-600 hover:bg-slate-100" aria-label="Notifications"><BellIcon className="h-5 w-5" />{unread > 0 && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />}</button>
                   {notifOpen && (
                     <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                      <div className="px-3 py-2 text-sm font-semibold text-slate-900">Notifications</div>
-                      {notifications.length === 0 ? <div className="px-3 py-4 text-sm text-slate-500">No notifications.</div> : notifications.map((n) => <div key={n.id} className={`rounded-xl px-3 py-3 ${n.unread ? 'bg-brand-50/60' : ''}`}><div className="text-sm font-medium text-slate-900">{n.title}</div><div className="text-xs text-slate-500">{n.body}</div></div>)}
+                      <div className="flex items-center justify-between px-3 py-2">
+                        <div className="text-sm font-semibold text-slate-900">Notifications</div>
+                        {unread > 0 && <button className="text-xs font-medium text-brand-600 hover:text-brand-700" onClick={() => { void notificationsApi.markAllRead().then(() => setNotifications((current) => current.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })))).catch(() => undefined) }}>Mark all read</button>}
+                      </div>
+                      {notifications.length === 0 ? <div className="px-3 py-4 text-sm text-slate-500">No notifications.</div> : notifications.map((n) => <div key={n.id} className={`rounded-xl px-3 py-3 ${!n.readAt ? 'bg-brand-50/60' : ''}`}><div className="text-sm font-medium text-slate-900">{n.subject ?? n.templateKey}</div><div className="text-xs text-slate-500">{n.body}</div></div>)}
                     </div>
                   )}
                 </div>

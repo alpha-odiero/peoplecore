@@ -27,7 +27,7 @@ export function ReportsPage() {
       const rows = balanceResult.value
       setAverageBalance(rows.length ? Math.round((rows.reduce((sum, row) => sum + row.allowanceDays, 0) / rows.length) * 10) / 10 : 0)
     }
-    if (payrollResult.status === 'fulfilled') setPayrollDraft(payrollResult.value.meta.total)
+    if (payrollResult.status === 'fulfilled') setPayrollDraft(payrollResult.value.length)
   }, [])
 
   useEffect(() => { void load() }, [load])

@@ -35,7 +35,7 @@ export function TasksPage() {
       })))
     }
     if (payrollResult.status === 'fulfilled') {
-      next.push(...payrollResult.value.data.map((row: PayrollRunRecord) => ({
+      next.push(...payrollResult.value.map((row: PayrollRunRecord) => ({
         id: `payroll-${row.id}`,
         title: 'Approve payroll run',
         detail: `${row.periodStart.slice(0, 10)} → ${row.periodEnd.slice(0, 10)}`,

@@ -27,7 +27,7 @@ export function PayrollPage() {
         payrollApi.structures(),
         employeesApi.list({ pageSize: 100 }),
       ])
-      setRuns(runRows.data)
+      setRuns(runRows)
       setRule(ruleResult.formula)
       setStructures(structureRows)
       setEmployees(employeeRows.data)

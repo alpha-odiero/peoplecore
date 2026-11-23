@@ -688,7 +688,7 @@ export const payrollApi = {
   structures: (employeeId?: string) => apiClient.get<Array<{ id: string; employeeId: string; currency: string; baseSalaryMinor: string; allowanceMinor: string; effectiveFrom: string }>>(`/payroll/structures${queryString({ employeeId })}`),
   createStructure: (body: { employeeId: string; currency: string; baseSalaryMinor: string; allowanceMinor?: string; effectiveFrom: string }) =>
     apiClient.post<{ id: string }>('/payroll/structures', body),
-  runs: (params: { status?: string } = {}) => apiClient.get<Page<PayrollRunRecord>>(`/payroll/runs${queryString(params)}`),
+  runs: (params: { status?: string } = {}) => apiClient.get<PayrollRunRecord[]>(`/payroll/runs${queryString(params)}`),
   run: (id: string) => apiClient.get<PayrollRunRecord & { payslips: PayslipRecord[] }>(`/payroll/runs/${id}`),
   createRun: (body: { periodStart: string; periodEnd: string; currency: string; taxRateBps: number }) =>
     apiClient.post<PayrollRunRecord>('/payroll/runs', body),

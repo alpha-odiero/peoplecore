@@ -11,7 +11,7 @@
     "tests"
   ],
   "scripts": {
-    "build": "npm run build -w @peoplecore/shared && npm run build -w @peoplecore/api",
+    "build": "npm run prisma:generate && npm run build -w @peoplecore/shared && npm run build -w @peoplecore/api",
     "dev": "npm run build -w @peoplecore/shared && npm run dev -w @peoplecore/api",
     "worker": "npm run build -w @peoplecore/shared && npm run worker -w @peoplecore/api",
     "start": "npm run start -w @peoplecore/api",

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+var/
+.env
+.env.local
+.env.*.local
+*.log
+*.tsbuildinfo
+.DS_Store
+.idea/
+.vscode/
+apps/api/prisma/generated/

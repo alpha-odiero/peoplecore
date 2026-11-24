@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: peoplecore
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/peoplecore?schema=public
+      PC_JWT_ACCESS_SECRET: ci-access-secret-at-least-32-bytes-long
+      PC_JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-bytes-long
+      PC_CSRF_SECRET: ci-csrf-secret-at-least-32-bytes-long
+      PC_REDIS_URL: ''
+      PC_STORAGE_DRIVER: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npm run prisma:validate
+      - run: npm run prisma:deploy
+      - run: npm run lint
+      - run: npm run security:secrets
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:coverage
+      - run: npm run build
+      - run: npm run format:check

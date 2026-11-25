@@ -14,8 +14,16 @@ async function bootstrap(): Promise<void> {
 
   app.use(helmet());
   app.use(cookieParser());
+  const configuredOrigins = config
+    .get<string>('PC_WEB_ORIGIN')
+    ?.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const allowedOrigins = Array.from(
+    new Set([...(configuredOrigins ?? []), 'https://peoplecore-rho.vercel.app']),
+  );
   app.enableCors({
-    origin: config.get<string>('PC_WEB_ORIGIN')?.split(',') ?? false,
+    origin: allowedOrigins,
     credentials: true,
     exposedHeaders: ['x-request-id', 'Idempotent-Replay'],
   });

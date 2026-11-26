@@ -104,6 +104,13 @@ function failureHint(diagnostics: DatabaseDiagnosticsResult, code: string): stri
   }
 
   const network = diagnostics.network;
+  if (
+    diagnostics.target &&
+    !diagnostics.target.isSupabasePooler &&
+    /\.supabase\.co$/i.test(diagnostics.target.host)
+  ) {
+    return 'DATABASE_URL uses the direct Supabase endpoint, which is IPv6-only on Render; replace DATABASE_URL and DIRECT_URL with the Session pooler string from Supabase Dashboard -> Connect';
+  }
   if (network?.dns === 'failed') {
     return `DNS resolution failed (${network.dnsError})`;
   }

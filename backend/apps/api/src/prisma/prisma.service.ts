@@ -1,6 +1,11 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../common/app-error';
+import {
+  logDiagnosticHint,
+  runDatabaseDiagnostics,
+  type DatabaseDiagnosticsResult,
+} from './database-diagnostics';
 
 const MAX_CONNECT_ATTEMPTS = 5;
 const RETRY_BASE_DELAY_MS = 250;
@@ -11,6 +16,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly logger = new Logger(PrismaService.name);
 
   async onModuleInit(): Promise<void> {
+    const diagnostics = await runDatabaseDiagnostics('startup');
+    if (diagnostics.reason !== 'ok') {
+      const message = startupConfigError(diagnostics.reason);
+      logDiagnosticHint('startup', message);
+      throw new Error(message);
+    }
+
     let lastErrorCode = 'UNKNOWN';
 
     for (let attempt = 1; attempt <= MAX_CONNECT_ATTEMPTS; attempt += 1) {
@@ -33,6 +45,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     this.logger.error(
       `Database connection unavailable after ${MAX_CONNECT_ATTEMPTS} attempt(s) (${lastErrorCode})`,
     );
+    logDiagnosticHint('startup', failureHint(diagnostics, lastErrorCode));
     throw new Error(`Database connection unavailable (${lastErrorCode})`);
   }
 
@@ -74,6 +87,36 @@ function escapeUuid(value: string): string {
     throw new AppError(400, 'INVALID_TENANT', 'Invalid tenant identifier');
   }
   return value;
+}
+
+function startupConfigError(reason: 'missing' | 'invalid' | 'env-source-mismatch'): string {
+  if (reason === 'missing') return 'DATABASE_URL is not set in the process environment';
+  if (reason === 'invalid') return 'DATABASE_URL is not a valid PostgreSQL connection URL';
+  return 'DATABASE_URL was changed after startup; a local .env value may be overriding the runtime environment';
+}
+
+function failureHint(diagnostics: DatabaseDiagnosticsResult, code: string): string {
+  if (diagnostics.reason === 'missing') {
+    return 'DATABASE_URL is not set in the process environment';
+  }
+  if (diagnostics.reason === 'invalid') {
+    return 'DATABASE_URL is not a valid PostgreSQL connection URL';
+  }
+
+  const network = diagnostics.network;
+  if (network?.dns === 'failed') {
+    return `DNS resolution failed (${network.dnsError})`;
+  }
+  if (network?.tcp === 'failed') {
+    return `TCP connection failed (${network.tcpError})`;
+  }
+  if (diagnostics.target && !diagnostics.target.isSupabasePooler) {
+    return 'Configured host is not a Supabase pooler host; use the Session pooler string from the dashboard';
+  }
+  if (network?.tcp === 'ok' && code === 'P1001') {
+    return 'TCP is reachable but Prisma reported P1001; check TLS, dashboard-copied URL and credentials';
+  }
+  return 'Database connection failed; review the diagnostics above';
 }
 
 function errorCodeOf(error: unknown): string {

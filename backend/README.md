@@ -57,12 +57,14 @@ Copy both database strings from **Supabase Dashboard → Project Settings → Da
 | `DATABASE_URL` | Prisma Client runtime connection                  |
 | `DIRECT_URL`   | Prisma CLI connection for `prisma migrate deploy` |
 
-Both should be the same Session pooler string. Set all other variables from `.env.example` (JWT/CSRF secrets, cookie and CORS settings) in Render as well.
+Both should be the same Session pooler string, copied verbatim (including any query parameters). Set all other variables from `.env.example` (JWT/CSRF secrets, cookie and CORS settings) in Render as well. In production, local `.env` files are ignored so Render's values always win.
 
 - **Build command:** `npm ci && npm run build`
 - **Start command:** `npm run start:prod`
 
 `start:prod` applies existing migrations forward-only before starting the API; it never resets or recreates the database.
+
+On startup the API writes `[database-diagnostics]` lines containing only whether `DATABASE_URL` is set, the parsed host, port, database name, whether the host is a Supabase pooler, and DNS/TCP results. Credentials and full URLs are never logged; use these lines to confirm Render received the pooler URL. In production (`NODE_ENV=production`) startup is refused if `DATABASE_URL` was not present before module loading, so a local `.env` cannot silently override Render's value.
 
 ## Build and verification
 

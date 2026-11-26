@@ -50,4 +50,12 @@ async function bootstrap(): Promise<void> {
   await app.listen(port, host);
 }
 
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`Fatal startup error: ${redactConnectionStrings(message)}\n`);
+  process.exit(1);
+});
+
+function redactConnectionStrings(message: string): string {
+  return message.replace(/postgres(?:ql)?:\/\/[^\s]+/gi, '[database URL redacted]');
+}

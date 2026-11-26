@@ -46,6 +46,24 @@ npm run worker
 
 Without Redis, the worker dispatches pending outbox events directly every 5 seconds. With Redis, it schedules BullMQ dispatch jobs.
 
+## Deployment on Render (Supabase)
+
+Set the Render service **Root Directory** to `backend` (this directory). Render injects environment variables; do not add a `.env` file to the service.
+
+Copy both database strings from **Supabase Dashboard → Project Settings → Database → Connect → Session pooler** (port `5432`, pooler host). Do not use the `db.<ref>.supabase.co` direct host: it is IPv6-only and Render is IPv4-only without the IPv4 add-on. Percent-encode special characters in the password before pasting.
+
+| Variable       | Purpose                                           |
+| -------------- | ------------------------------------------------- |
+| `DATABASE_URL` | Prisma Client runtime connection                  |
+| `DIRECT_URL`   | Prisma CLI connection for `prisma migrate deploy` |
+
+Both should be the same Session pooler string. Set all other variables from `.env.example` (JWT/CSRF secrets, cookie and CORS settings) in Render as well.
+
+- **Build command:** `npm ci && npm run build`
+- **Start command:** `npm run start:prod`
+
+`start:prod` applies existing migrations forward-only before starting the API; it never resets or recreates the database.
+
 ## Build and verification
 
 ```bash

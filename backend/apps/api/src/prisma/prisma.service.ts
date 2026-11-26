@@ -1,11 +1,39 @@
-import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { AppError } from '../common/app-error';
 
+const MAX_CONNECT_ATTEMPTS = 5;
+const RETRY_BASE_DELAY_MS = 250;
+const RETRYABLE_ERROR_CODES = new Set(['P1001', 'P1002', 'P1008', 'P1017']);
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(PrismaService.name);
+
   async onModuleInit(): Promise<void> {
-    await this.$connect();
+    let lastErrorCode = 'UNKNOWN';
+
+    for (let attempt = 1; attempt <= MAX_CONNECT_ATTEMPTS; attempt += 1) {
+      try {
+        await this.$connect();
+        return;
+      } catch (error: unknown) {
+        lastErrorCode = errorCodeOf(error);
+        if (!RETRYABLE_ERROR_CODES.has(lastErrorCode) || attempt === MAX_CONNECT_ATTEMPTS) {
+          break;
+        }
+        const delay = RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+        this.logger.warn(
+          `Database connection attempt ${attempt}/${MAX_CONNECT_ATTEMPTS} failed (${lastErrorCode}); retrying in ${delay}ms`,
+        );
+        await sleep(delay);
+      }
+    }
+
+    this.logger.error(
+      `Database connection unavailable after ${MAX_CONNECT_ATTEMPTS} attempt(s) (${lastErrorCode})`,
+    );
+    throw new Error(`Database connection unavailable (${lastErrorCode})`);
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -46,4 +74,16 @@ function escapeUuid(value: string): string {
     throw new AppError(400, 'INVALID_TENANT', 'Invalid tenant identifier');
   }
   return value;
+}
+
+function errorCodeOf(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'errorCode' in error) {
+    const code = (error as { errorCode?: unknown }).errorCode;
+    if (typeof code === 'string') return code;
+  }
+  return 'UNKNOWN';
+}
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

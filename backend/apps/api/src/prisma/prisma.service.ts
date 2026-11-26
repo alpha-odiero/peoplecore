@@ -23,6 +23,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       throw new Error(message);
     }
 
+    const target = diagnostics.target;
+    if (target && !target.isSupabasePooler && /\.supabase\.co$/i.test(target.host)) {
+      const message = failureHint(diagnostics, 'P1001');
+      logDiagnosticHint('startup', message);
+      throw new Error(message);
+    }
+
     let lastErrorCode = 'UNKNOWN';
 
     for (let attempt = 1; attempt <= MAX_CONNECT_ATTEMPTS; attempt += 1) {

@@ -72,7 +72,7 @@ services:
 
   api:
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     env_file:
@@ -111,7 +111,7 @@ services:
 
   worker:
     build:
-      context: ../..
+      context: ..
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
     command: ['node', 'apps/api/dist/worker.js']

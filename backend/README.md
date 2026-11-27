@@ -64,6 +64,18 @@ Both should be the same Session pooler string, copied verbatim (including any qu
 
 `start:prod` applies existing migrations forward-only before starting the API; it never resets or recreates the database.
 
+### Docker runtime
+
+If the Render service uses the Docker runtime instead, set:
+
+- **Root Directory:** `backend`
+- **Dockerfile Path:** `apps/api/Dockerfile`
+- **Docker Context Directory:** `.` (the default, relative to Root Directory)
+
+Alternatively, leave Root Directory at the repository root and set **Dockerfile Path** to `backend/apps/api/Dockerfile` and **Docker Context Directory** to `backend`.
+
+`Dockerfile Path` must point to the file, not the `backend` directory; passing a directory produces `failed to read dockerfile: read .../backend: is a directory`. The Dockerfile's `COPY` paths assume `backend/` is the build context. Local Compose builds use the same context via `backend/docker/docker-compose.yml`.
+
 On startup the API writes `[database-diagnostics]` lines containing only whether `DATABASE_URL` is set, the parsed host, port, database name, whether the host is a Supabase pooler, and DNS/TCP results. Credentials and full URLs are never logged; use these lines to confirm Render received the pooler URL. In production (`NODE_ENV=production`) startup is refused if `DATABASE_URL` was not present before module loading, so a local `.env` cannot silently override Render's value.
 
 ## Build and verification

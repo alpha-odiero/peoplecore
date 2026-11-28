@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://peoplecore-1-mms2.onrender.com/api/v1' : 'http://localhost:3000/api/v1')
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? 'https://peoplecore-duam.onrender.com/api/v1' : 'http://localhost:3000/api/v1')
 const DEFAULT_TENANT_SLUG = import.meta.env.VITE_TENANT_SLUG ?? 'demo'
 const TOKEN_KEY = 'ems_access_token'
 const SESSION_KEY = 'ems_auth_session'

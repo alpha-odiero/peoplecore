@@ -74,6 +74,8 @@ cp .env.example .env
 | ------------------- | ------------------------------ | --------------------------------- |
 | `VITE_API_BASE_URL` | `http://localhost:3000/api/v1` | Base URL used by `src/lib/api.ts` |
 
+Production builds without `VITE_API_BASE_URL` use `https://peoplecore-duam.onrender.com/api/v1`.
+
 ### Scripts
 
 Run these from `apps/web`:

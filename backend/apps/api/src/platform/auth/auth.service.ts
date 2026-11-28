@@ -99,108 +99,112 @@ export class AuthService {
     const slug = await this.availableTenantSlug(dto.tenantName);
     const passwordHash = await hash(dto.password, PASSWORD_OPTIONS);
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({
-        data: {
-          name: dto.tenantName,
-          slug,
-          status: 'active',
-          settings: { createdBy: 'self_service_registration' },
-        },
-      });
-      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenant.id}, true)`;
+    await this.prisma.permission.createMany({
+      data: PERMISSIONS.map((permission) => ({
+        key: permission,
+        category: PERMISSION_CATEGORY_BY_PREFIX[permission.split('.')[0] ?? ''] ?? 'Other',
+        description: `${permission} access`,
+      })),
+      skipDuplicates: true,
+    });
+    const permissions = await this.prisma.permission.findMany({
+      where: { key: { in: [...PERMISSIONS] } },
+      select: { id: true, key: true },
+    });
+    const permissionIdByKey = new Map(
+      permissions.map((permission) => [permission.key, permission.id]),
+    );
 
-      for (const permission of PERMISSIONS) {
-        await tx.permission.upsert({
-          where: { key: permission },
-          update: {},
-          create: {
-            key: permission,
-            category: PERMISSION_CATEGORY_BY_PREFIX[permission.split('.')[0] ?? ''] ?? 'Other',
-            description: `${permission} access`,
+    const created = await this.prisma.$transaction(
+      async (tx) => {
+        const tenant = await tx.tenant.create({
+          data: {
+            name: dto.tenantName,
+            slug,
+            status: 'active',
+            settings: { createdBy: 'self_service_registration' },
           },
         });
-      }
-      const permissions = await tx.permission.findMany({
-        where: { key: { in: [...PERMISSIONS] } },
-        select: { id: true, key: true },
-      });
-      const permissionIdByKey = new Map(
-        permissions.map((permission) => [permission.key, permission.id]),
-      );
-      const roles = new Map<RoleKey, string>();
+        await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenant.id}, true)`;
 
-      for (const roleKey of Object.keys(ROLE_PERMISSIONS) as RoleKey[]) {
-        const role = await tx.role.create({
+        const roles = new Map<RoleKey, string>();
+
+        for (const roleKey of Object.keys(ROLE_PERMISSIONS) as RoleKey[]) {
+          const role = await tx.role.create({
+            data: {
+              tenantId: tenant.id,
+              key: roleKey,
+              name: ROLE_NAMES[roleKey],
+              isSystem: true,
+            },
+          });
+          roles.set(roleKey, role.id);
+          const grants = ROLE_PERMISSIONS[roleKey]
+            .map((permission) => permissionIdByKey.get(permission))
+            .filter((id): id is string => Boolean(id))
+            .map((permissionId) => ({
+              tenantId: tenant.id,
+              roleId: role.id,
+              permissionId,
+            }));
+          if (grants.length > 0) {
+            await tx.rolePermission.createMany({ data: grants, skipDuplicates: true });
+          }
+        }
+
+        const user = await tx.user.create({
           data: {
             tenantId: tenant.id,
-            key: roleKey,
-            name: ROLE_NAMES[roleKey],
-            isSystem: true,
+            email: dto.email,
+            passwordHash,
+            firstName: dto.name.split(' ')[0] ?? dto.name,
+            lastName: dto.name.split(' ').slice(1).join(' ') || null,
+            status: 'active',
+            permissionVersion: 1,
           },
         });
-        roles.set(roleKey, role.id);
-        const grants = ROLE_PERMISSIONS[roleKey]
-          .map((permission) => permissionIdByKey.get(permission))
-          .filter((id): id is string => Boolean(id))
-          .map((permissionId) => ({
+
+        const adminRoleId = roles.get('tenant_admin');
+        if (!adminRoleId) throw new AppError(500, 'ROLE_SETUP_FAILED', 'Admin role setup failed');
+        await tx.userRole.create({
+          data: {
             tenantId: tenant.id,
-            roleId: role.id,
-            permissionId,
-          }));
-        if (grants.length > 0) {
-          await tx.rolePermission.createMany({ data: grants, skipDuplicates: true });
-        }
-      }
+            userId: user.id,
+            roleId: adminRoleId,
+            scopeType: 'tenant',
+          },
+        });
 
-      const user = await tx.user.create({
-        data: {
-          tenantId: tenant.id,
-          email: dto.email,
-          passwordHash,
-          firstName: dto.name.split(' ')[0] ?? dto.name,
-          lastName: dto.name.split(' ').slice(1).join(' ') || null,
-          status: 'active',
-          permissionVersion: 1,
-        },
-      });
+        await tx.auditEvent.create({
+          data: {
+            tenantId: tenant.id,
+            actorUserId: user.id,
+            actorType: 'user',
+            action: 'auth.register',
+            resourceType: 'tenant',
+            resourceId: tenant.id,
+            after: { slug, adminEmail: dto.email } as Prisma.InputJsonValue,
+            metadata: { ip: request.ip ?? null } as Prisma.InputJsonValue,
+          },
+        });
+        await this.outbox.publish(
+          {
+            tenantId: tenant.id,
+            eventType: 'auth.tenant_registered',
+            aggregateType: 'tenant',
+            aggregateId: tenant.id,
+            payload: { slug, adminEmail: dto.email },
+          },
+          tx,
+        );
 
-      const adminRoleId = roles.get('tenant_admin');
-      if (!adminRoleId) throw new AppError(500, 'ROLE_SETUP_FAILED', 'Admin role setup failed');
-      await tx.userRole.create({
-        data: {
-          tenantId: tenant.id,
-          userId: user.id,
-          roleId: adminRoleId,
-          scopeType: 'tenant',
-        },
-      });
-
-      await tx.auditEvent.create({
-        data: {
-          tenantId: tenant.id,
-          actorUserId: user.id,
-          actorType: 'user',
-          action: 'auth.register',
-          resourceType: 'tenant',
-          resourceId: tenant.id,
-          after: { slug, adminEmail: dto.email } as Prisma.InputJsonValue,
-          metadata: { ip: request.ip ?? null } as Prisma.InputJsonValue,
-        },
-      });
-      await this.outbox.publish(
-        {
-          tenantId: tenant.id,
-          eventType: 'auth.tenant_registered',
-          aggregateType: 'tenant',
-          aggregateId: tenant.id,
-          payload: { slug, adminEmail: dto.email },
-        },
-        tx,
-      );
-
-      return { tenant, user };
-    });
+        return { tenant, user };
+      },
+      {
+        maxWait: 10_000,
+        timeout: 20_000,
+      },
+    );
 
     return this.createSession(created.user, created.tenant.slug, request);
   }

@@ -23,7 +23,8 @@ export class TenantGuard implements CanActivate {
     ]);
     const requestContext = getRequestContext();
     const bodySlug = (request.body as { tenantSlug?: string } | undefined)?.tenantSlug;
-    let slug = requestContext.tenantSlug || bodySlug?.toLowerCase();
+    const headerSlug = request.header('x-tenant-slug')?.toLowerCase();
+    let slug = requestContext.tenantSlug || headerSlug || bodySlug?.toLowerCase();
 
     if (!slug && process.env.NODE_ENV !== 'production') {
       slug = process.env.PC_DEFAULT_TENANT_SLUG ?? 'demo';
